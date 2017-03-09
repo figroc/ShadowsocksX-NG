@@ -4,6 +4,7 @@
 var proxy = "SOCKS5 127.0.0.1:__SOCKS5PORT__; SOCKS 127.0.0.1:__SOCKS5PORT__; DIRECT;";
 
 var rules = __RULES__;
+var locals = __LOCALS__;
 
 /*
  * This file is part of Adblock Plus <http://adblockplus.org/>,
@@ -765,12 +766,21 @@ var defaultMatcher = new CombinedMatcher();
 
 var direct = 'DIRECT;';
 
+for (var i = 0; i < locals.length; i++) {
+  var filter = Filter.fromText(locals[i].rule);
+  filter._local_proxy_ = locals[i].proxy;
+  defaultMatcher.add(filter);
+}
 for (var i = 0; i < rules.length; i++) {
   defaultMatcher.add(Filter.fromText(rules[i]));
 }
 
 function FindProxyForURL(url, host) {
-  if (defaultMatcher.matchesAny(url, host) instanceof BlockingFilter) {
+  var filter = defaultMatcher.matchesAny(url, host);
+  if (filter instanceof BlockingFilter) {
+    if (filter.hasOwnProperty('_local_proxy_')) {
+      return filter._local_proxy_;
+    }
     return proxy;
   }
   return direct;
