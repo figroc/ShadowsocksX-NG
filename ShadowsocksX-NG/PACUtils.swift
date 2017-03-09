@@ -91,6 +91,7 @@ func GeneratePACFile() -> Bool {
         if let data = Data(base64Encoded: gfwlist, options: .ignoreUnknownCharacters) {
             let str = String(data: data, encoding: String.Encoding.utf8)
             var lines = str!.components(separatedBy: CharacterSet.newlines)
+            var locals = [[String:String]]()
             
             do {
                 let userRuleStr = try String(contentsOfFile: PACUserRuleFilePath, encoding: String.Encoding.utf8)
@@ -110,10 +111,23 @@ func GeneratePACFile() -> Bool {
                 if c == "!" || c == "[" {
                     return false
                 }
+                if s.hasPrefix("#!") {
+                    var local = s.substring(from: s.index(s.startIndex, offsetBy: 2))
+                        .components(separatedBy: "==")
+                    locals.append([
+                        "rule" : local[0].trimmingCharacters(in: .whitespaces),
+                        "proxy": local[1].trimmingCharacters(in: .whitespaces)
+                    ])
+                    return false
+                }
                 return true
             })
             
             do {
+                // local lines to json array
+                let localsJsonData: Data
+                    = try JSONSerialization.data(withJSONObject: locals, options: .prettyPrinted)
+                let localsJsonStr = String(data: localsJsonData, encoding: String.Encoding.utf8)
                 // rule lines to json array
                 let rulesJsonData: Data
                     = try JSONSerialization.data(withJSONObject: lines, options: .prettyPrinted)
@@ -125,6 +139,8 @@ func GeneratePACFile() -> Bool {
                 var jsStr = String(data: jsData!, encoding: String.Encoding.utf8)
                 
                 // Replace rules placeholder in pac js
+                jsStr = jsStr!.replacingOccurrences(of: "__LOCALS__"
+                    , with: localsJsonStr!)
                 jsStr = jsStr!.replacingOccurrences(of: "__RULES__"
                     , with: rulesJsonStr!)
                 // Replace __SOCKS5PORT__ palcholder in pac js
